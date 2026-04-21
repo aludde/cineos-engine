@@ -16,21 +16,54 @@ export default function NewProjectGateway() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = async (file: File) => {
-    if (!file.name.endsWith('.txt')) { alert("Please upload a .txt file script."); return; }
+    // 1. UPDATED: Allow both .txt and .pdf
+    if (!file.name.endsWith('.txt') && !file.name.endsWith('.pdf')) { 
+      alert("Please upload a .txt or .pdf script."); 
+      return; 
+    }
+    
     setStep('PROCESSING');
+    
     try {
-      const text = await file.text();
+      let scriptText = "";
+
+      // 2. NEW: The PDF Splitter Logic
+      if (file.name.endsWith('.pdf')) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Send to our new local PDF extractor API
+        const extractRes = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!extractRes.ok) throw new Error("Could not read the PDF file.");
+        const extractData = await extractRes.json();
+        scriptText = extractData.text;
+      } else {
+        // It's a .txt file, just read it directly in the browser
+        scriptText = await file.text();
+      }
+
+      // 3. Send the raw string text to the AI
       const response = await fetch('/api/parse', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scriptText: text }),
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ scriptText }), // Use the extracted text
       });
+      
       if (!response.ok) throw new Error("AI Parsing Failed");
+      
       const data = await response.json();
       setParsedData(data);
       setProjectName(data.title || 'Untitled Project');
       setAgencyName(data.agency || '');
       setStep('CONFIRM');
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error(error);
+      alert(error.message || "Failed to process script.");
       setStep('UPLOAD');
     }
   };
@@ -63,8 +96,9 @@ export default function NewProjectGateway() {
       if (assetsToInsert.length > 0) await supabase.from('assets').insert(assetsToInsert);
 
       router.push(`/project/${project.id}/breakdown`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      alert("Database Error: " + (error.message || "Failed to save project."));
       setStep('CONFIRM');
     }
   };
@@ -76,7 +110,10 @@ export default function NewProjectGateway() {
         {(step === 'UPLOAD' || step === 'PROCESSING') && (
           <>
             <div className="mb-10 text-center"><h2 className="text-4xl font-extrabold mb-3">Initialize Project</h2><p className="text-neutral-500">Drop your A/V Script below.</p></div>
-            <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && processFile(e.target.files[0])} accept=".txt" className="hidden" />
+            
+            {/* UPDATED: accept attribute now allows .pdf */}
+            <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && processFile(e.target.files[0])} accept=".txt,.pdf" className="hidden" />
+            
             <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]); }} onClick={() => step !== 'PROCESSING' && fileInputRef.current?.click()} className={`w-full p-16 text-center transition-all duration-500 border border-dashed rounded-none relative overflow-hidden ${step === 'PROCESSING' ? 'border-[#E62B1E] cursor-wait' : 'border-neutral-800 bg-neutral-950/50 hover:border-neutral-600 cursor-pointer'}`}>
               <div className="flex flex-col items-center space-y-6 relative z-10">
                 <div className={`p-5 rounded-full ${step === 'PROCESSING' ? 'bg-[#E62B1E]/20' : 'bg-black border border-neutral-800'}`}>
@@ -84,7 +121,8 @@ export default function NewProjectGateway() {
                 </div>
                 <div>
                   <h3 className={`text-2xl font-bold mb-2 ${step === 'PROCESSING' ? 'text-white' : 'text-[#E62B1E]'}`}>{step === 'PROCESSING' ? 'Extracting Assets...' : 'Launch Script Parser'}</h3>
-                  <p className="text-sm text-neutral-500 font-light">Click or drag & drop a .txt script.</p>
+                  {/* UPDATED: Added .pdf to the UI text */}
+                  <p className="text-sm text-neutral-500 font-light">Click or drag & drop a .txt or .pdf script.</p>
                 </div>
               </div>
             </div>
