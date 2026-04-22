@@ -1,6 +1,7 @@
 import { create } from 'zustand';
+// 1. IMPORT THE PERSIST MIDDLEWARE
+import { persist } from 'zustand/middleware';
 
-// Define the shape of the data your Dashboard is expecting
 interface Asset {
   category: string;
   description: string;
@@ -24,9 +25,16 @@ interface ProjectStore {
   clearProject: () => void;
 }
 
-// Create the global store
-export const useProjectStore = create<ProjectStore>((set) => ({
-  activeProject: null,
-  setActiveProject: (project) => set({ activeProject: project }),
-  clearProject: () => set({ activeProject: null }),
-}));
+// 2. WRAP YOUR STORE IN "persist"
+export const useProjectStore = create<ProjectStore>()(
+  persist(
+    (set) => ({
+      activeProject: null,
+      setActiveProject: (project) => set({ activeProject: project }),
+      clearProject: () => set({ activeProject: null }),
+    }),
+    {
+      name: 'cineos-guest-storage', // This is the secret key saved in their browser
+    }
+  )
+);

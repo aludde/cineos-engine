@@ -6,12 +6,21 @@ import { motion } from 'framer-motion';
 import { LayoutList, Calendar, IndianRupee, Save, Trash2, Plus, Loader2, FileUp, Download, MessageCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Header from '@/components/Header';
+import { useProjectStore } from '@/store/projectStore'; // <-- ADDED THE STORE
 
 export default function BreakdownHub() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
   
+  const activeProject = useProjectStore((state: any) => state.activeProject);
+  
+  // --- THE GUEST TOGGLE ---
+  // We are forcing this to TRUE right now so you can test the exact Guest Experience.
+  // Once you build your login page, you will change this to check for a Supabase session:
+  // const isGuest = !(await supabase.auth.getSession()).data.session;
+  const isGuest = true; 
+
   const [project, setProject] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,14 +33,43 @@ export default function BreakdownHub() {
 
   useEffect(() => {
     async function loadData() {
+      // 1. GUEST MODE: Load from Local Storage instead of Supabase
+      if (isGuest) {
+        if (activeProject) {
+          setProject(activeProject);
+          
+          // Flatten the nested AI assets into the flat array the grid expects
+          const guestAssets: any[] = [];
+          activeProject.scenes?.forEach((scene: any) => {
+            scene.assets?.forEach((asset: any) => {
+              guestAssets.push({
+                id: `guest-asset-${Date.now()}-${Math.random()}`,
+                project_id: 'guest',
+                scene_id: scene.id || null,
+                category: asset.category,
+                description: asset.description,
+                quantity: asset.quantity || 1,
+                unit_price: 0,
+                created_at: new Date().toISOString()
+              });
+            });
+          });
+          setAssets(guestAssets);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 2. AUTHENTICATED MODE: Load from Supabase
       const { data: projData } = await supabase.from('projects').select('*').eq('id', projectId).single();
       setProject(projData);
       const { data: assetData } = await supabase.from('assets').select('*').eq('project_id', projectId);
       setAssets(assetData || []);
       setLoading(false);
     }
+    
     if (projectId) loadData();
-  }, [projectId]);
+  }, [projectId, activeProject, isGuest]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -70,13 +108,20 @@ export default function BreakdownHub() {
       description: 'New Item', 
       quantity: 1, 
       unit_price: 0,
-      created_at: new Date().toISOString() // <-- ADD THIS LINE
+      created_at: new Date().toISOString() 
     }]);
     setHasUnsavedChanges(true);
   };
 
   const handleProcessRevision = async (file: File) => {
-    // Upgraded to accept both txt and pdf for revisions!
+    // THE PAYWALL: Block expensive AI compute for guests
+    if (isGuest) {
+      alert("Script Syncing is a premium feature! Create a free account to unlock non-destructive script revisions.");
+      // router.push('/login'); <-- Uncomment this later to teleport them to signup
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     if (!file.name.endsWith('.txt') && !file.name.endsWith('.pdf')) { 
       alert("Please upload a .txt or .pdf script."); 
       return; 
@@ -87,7 +132,6 @@ export default function BreakdownHub() {
     try {
       let scriptText = "";
 
-      // Route through the PDF engine if it's a PDF
       if (file.name.endsWith('.pdf')) {
         const formData = new FormData();
         formData.append('file', file);
@@ -99,7 +143,6 @@ export default function BreakdownHub() {
         scriptText = await file.text();
       }
 
-      // Send to AI
       const response = await fetch('/api/parse', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scriptText }),
       });
@@ -125,9 +168,9 @@ export default function BreakdownHub() {
               description: `[NEW] ${asset.description}`,
               quantity: asset.quantity || 1,
               unit_price: 0,
-              created_at: new Date().toISOString() // <-- The safe timestamp
+              created_at: new Date().toISOString()
             });
-          } // <-- THIS is the bracket that went missing!
+          } 
         });
       });
 
@@ -150,6 +193,12 @@ export default function BreakdownHub() {
   };
 
   const handleExportCSV = () => {
+    // THE PAYWALL: Lock data extraction
+    if (isGuest) {
+      alert("Love this breakdown? Create a free account to export your data to Excel and unlock unlimited parsing!");
+      return;
+    }
+
     const headers = ["Category", "Description", "Quantity"];
     const rows = assets.map(a => `"${a.category}","${a.description.replace('[NEW] ', '')}",${a.quantity}`);
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
@@ -164,6 +213,7 @@ export default function BreakdownHub() {
   };
 
   const handleWhatsAppShare = (categoryFilter?: string) => {
+    // We let guests share to WhatsApp! It's a great viral marketing loop.
     let text = `*${project?.title || 'Project'} - Breakdown*\n\n`;
     
     Object.entries(categorizedAssets).forEach(([category, items]: [string, any]) => {
@@ -181,6 +231,12 @@ export default function BreakdownHub() {
   };
 
   const handleSaveBreakdown = async () => {
+    // THE PAYWALL: Lock database saving
+    if (isGuest) {
+      alert("Love this breakdown? Create a free account to secure your edits in the cloud permanently!");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const { error: deleteError } = await supabase.from('assets').delete().eq('project_id', projectId);
@@ -231,7 +287,7 @@ export default function BreakdownHub() {
         
         <div className="flex flex-col md:flex-row justify-between border-b border-neutral-800 pb-8 mb-8 md:items-end gap-6">
           <div>
-            <h1 className="text-4xl md:text-5xl font-extrabold uppercase tracking-tighter mb-2">{project?.title}</h1>
+            <h1 className="text-4xl md:text-5xl font-extrabold uppercase tracking-tighter mb-2">{project?.title || "Untitled Project"}</h1>
             <p className="text-sm text-[#E62B1E] font-bold uppercase tracking-widest">
               Editable Breakdown {hasUnsavedChanges && <span className="text-neutral-500 lowercase tracking-normal font-normal ml-2">*unsaved changes</span>}
             </p>
@@ -280,8 +336,8 @@ export default function BreakdownHub() {
             
             <button 
               onClick={handleSaveBreakdown} 
-              disabled={!hasUnsavedChanges && !isSaving}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-bold uppercase tracking-widest transition-colors shrink-0 ${hasUnsavedChanges ? 'bg-[#E62B1E] hover:bg-white hover:text-black text-white' : 'bg-neutral-900 text-neutral-600 cursor-not-allowed border border-neutral-800'}`}
+              disabled={!hasUnsavedChanges && !isSaving && !isGuest}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-bold uppercase tracking-widest transition-colors shrink-0 ${(hasUnsavedChanges || isGuest) ? 'bg-[#E62B1E] hover:bg-white hover:text-black text-white' : 'bg-neutral-900 text-neutral-600 cursor-not-allowed border border-neutral-800'}`}
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Edits
             </button>
