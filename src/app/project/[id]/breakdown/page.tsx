@@ -266,8 +266,8 @@ export default function BreakdownHub() {
             </button>
           </div>
           
-          <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && handleProcessRevision(e.target.files[0])} accept=".txt" className="hidden" />
-
+          <input type="file" ref={fileInputRef} onChange={(e) => e.target.files && handleProcessRevision(e.target.files[0])} accept=".txt,.pdf" className="hidden" />
+          
           <div className="flex gap-2 shrink-0">
             <button 
               onClick={() => fileInputRef.current?.click()} 
