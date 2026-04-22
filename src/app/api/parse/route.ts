@@ -3,30 +3,43 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const PARSER_SYSTEM_PROMPT = `
-You are an expert Line Producer. Extract a strict logistical breakdown from the script.
-Return ONLY a raw, valid JSON object matching this structure:
+const SYSTEM_PROMPT = `
+You are a master First Assistant Director and Line Producer specializing in Commercial and Advertisement production. Your job is to read the provided commercial script text and extract a strict, literal, and comprehensive logistical breakdown. 
+
+CRITICAL RULES:
+1. ADVERTISEMENT FOCUS: Pay special attention to "Hero" products, brand-specific props, and agency notes. If a specific brand product or packaging is mentioned, extract it meticulously. 
+2. BE LITERAL: Do not assume or invent props, wardrobe, or vehicles that are not explicitly written on the page or physically required by the literal action.
+3. SLUGLINE PARSING (MANDATORY): You must extract the Setting, Location, and Time of Day from the scene headings. 
+   - Example Heading: "EXT. DOWNTOWN COFFEE SHOP - MAGIC HOUR"
+   - Result -> Setting: "EXT", Location: "Downtown Coffee Shop", TimeOfDay: "MAGIC HOUR".
+4. BACKGROUND CAST: Group non-speaking background actors under "Cast" with the prefix "[BG]" (e.g., "[BG] Pedestrians").
+5. ACCURACY: If a category has no items in a scene, omit the items rather than hallucinating them.
+
+Return ONLY a raw, valid JSON object matching this exact structure:
+
 {
-  "title": "Project Name (infer if not explicit)",
-  "agency": "Agency Name (if found)",
+  "title": "Project Name (infer if not explicit, otherwise 'Unknown')",
+  "agency": "Agency Name (if found, otherwise 'Unknown')",
   "scenes": [
     {
       "id": "scene-1",
       "sceneNumber": "1",
       "setting": "INT or EXT",
-      "location": "Brief location name",
-      "timeOfDay": "DAY, NIGHT, or MAGIC HOUR",
-      "actionSummary": "1 sentence describing action.",
+      "location": "Specific location from the slugline",
+      "timeOfDay": "DAY, NIGHT, etc.",
+      "actionSummary": "One concise sentence describing the literal action.",
       "assets": [
         {
-          "category": "Cast | Prop | Wardrobe | Camera | Vehicle | Location",
-          "description": "Specific item",
+          "category": "Cast | Prop | Wardrobe | Camera | Vehicle",
+          "description": "Specific item name",
           "quantity": 1
         }
       ]
     }
   ]
 }
+
+ACTUAL SCRIPT TO BREAK DOWN:
 `;
 
 export async function POST(request: Request) {
@@ -34,7 +47,7 @@ export async function POST(request: Request) {
     const { scriptText } = await request.json();
     if (!scriptText) return NextResponse.json({ error: "No script provided" }, { status: 400 });
 
-    const prompt = `${PARSER_SYSTEM_PROMPT}\n\n=== SCRIPT ===\n${scriptText}`;
+    const prompt = `${SYSTEM_PROMPT}\n\n=== SCRIPT ===\n${scriptText}`;
     
     // --- THE RETRY ENGINE ---
     const MAX_RETRIES = 3;
@@ -44,8 +57,10 @@ export async function POST(request: Request) {
       try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: { responseMimeType: "application/json" }
+            contents: `${SYSTEM_PROMPT}\n\n${scriptText}`,
+            config: { 
+              responseMimeType: "application/json",
+              temperature: 0.1,  }
         });
 
         // If successful, return the data and break the loop
