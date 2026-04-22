@@ -69,19 +69,39 @@ export default function BreakdownHub() {
       category, 
       description: 'New Item', 
       quantity: 1, 
-      unit_price: 0 
+      unit_price: 0,
+      created_at: new Date().toISOString() // <-- ADD THIS LINE
     }]);
     setHasUnsavedChanges(true);
   };
 
   const handleProcessRevision = async (file: File) => {
-    if (!file.name.endsWith('.txt')) { alert("Please upload a .txt file."); return; }
+    // Upgraded to accept both txt and pdf for revisions!
+    if (!file.name.endsWith('.txt') && !file.name.endsWith('.pdf')) { 
+      alert("Please upload a .txt or .pdf script."); 
+      return; 
+    }
+    
     setIsProcessingRevision(true);
     
     try {
-      const text = await file.text();
+      let scriptText = "";
+
+      // Route through the PDF engine if it's a PDF
+      if (file.name.endsWith('.pdf')) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const extractRes = await fetch('/api/extract-pdf', { method: 'POST', body: formData });
+        if (!extractRes.ok) throw new Error("Could not read the PDF file.");
+        const extractData = await extractRes.json();
+        scriptText = extractData.text;
+      } else {
+        scriptText = await file.text();
+      }
+
+      // Send to AI
       const response = await fetch('/api/parse', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scriptText: text }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scriptText }),
       });
       
       if (!response.ok) throw new Error("AI Parsing Failed");
@@ -104,9 +124,10 @@ export default function BreakdownHub() {
               category: asset.category,
               description: `[NEW] ${asset.description}`,
               quantity: asset.quantity || 1,
-              unit_price: 0
+              unit_price: 0,
+              created_at: new Date().toISOString() // <-- The safe timestamp
             });
-          }
+          } // <-- THIS is the bracket that went missing!
         });
       });
 
