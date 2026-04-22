@@ -6,9 +6,11 @@ import { motion } from 'framer-motion';
 import { UploadCloud, Loader2, Check } from 'lucide-react';
 import Header from '@/components/Header';
 import { supabase } from '@/lib/supabase';
+import { useProjectStore } from '@/store/projectStore';
 
 export default function NewProjectGateway() {
   const router = useRouter();
+  const setActiveProject = useProjectStore((state) => state.setActiveProject);
   const [step, setStep] = useState<'UPLOAD' | 'PROCESSING' | 'CONFIRM' | 'SAVING'>('UPLOAD');
   const [parsedData, setParsedData] = useState<any>(null);
   const [projectName, setProjectName] = useState('');

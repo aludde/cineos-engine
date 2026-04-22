@@ -3,10 +3,15 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { UploadCloud, Loader2 } from 'lucide-react';
+import { useProjectStore } from '@/store/projectStore';
+import { useRouter } from 'next/navigation';
 
 export default function UploadDropzone() {
   const [isDragging, setIsDragging] = useState(false);
+  const setActiveProject = useProjectStore((state) => state.setActiveProject);
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter();
+  const [step, setStep] = useState('UPLOAD');
   
   // 1. Create a reference to our hidden file input
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,8 +52,10 @@ export default function UploadDropzone() {
 
     } catch (error) {
       console.error("Error parsing file:", error);
-      setIsProcessing(false); 
-    };
+      alert("Failed to process script.");
+      setStep('UPLOAD');
+    }
+  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
