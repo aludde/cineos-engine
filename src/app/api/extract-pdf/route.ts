@@ -10,15 +10,27 @@ export async function POST(request: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    const PDFParser = require('pdf2json');
     
-    // THE FIX: Require the package dynamically inside the function
-    const pdfParse = require('pdf-parse');
-    const data = await pdfParse(buffer);
-
-    return NextResponse.json({ text: data.text });
+    // THE FIX: Tell TypeScript this Promise specifically resolves to a NextResponse
+    return new Promise<NextResponse>((resolve) => {
+      const pdfParser = new PDFParser(null, 1);
+      
+      pdfParser.on("pdfParser_dataError", (errData: any) => {
+        console.error("PDF Parsing Error:", errData.parserError);
+        resolve(NextResponse.json({ error: "Failed to parse PDF format." }, { status: 500 }));
+      });
+      
+      pdfParser.on("pdfParser_dataReady", () => {
+        const text = pdfParser.getRawTextContent();
+        resolve(NextResponse.json({ text }));
+      });
+      
+      pdfParser.parseBuffer(buffer);
+    });
     
   } catch (error: any) {
-    console.error("PDF Extraction Error:", error);
-    return NextResponse.json({ error: "Failed to read PDF file." }, { status: 500 });
+    console.error("Extraction Setup Error:", error);
+    return NextResponse.json({ error: "Failed to initialize PDF reader." }, { status: 500 });
   }
 }
