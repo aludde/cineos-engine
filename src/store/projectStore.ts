@@ -20,21 +20,24 @@ interface Project {
 }
 
 interface ProjectStore {
-  activeProject: Project | null;
-  setActiveProject: (project: Project | null) => void;
+  activeProject: any | null;
+  isGuestMode: boolean; // <-- 1. ADD THIS
+  setActiveProject: (project: any | null) => void;
   clearProject: () => void;
+  setGuestMode: (isGuest: boolean) => void; // <-- 2. ADD THIS
 }
 
-// 2. WRAP YOUR STORE IN "persist"
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
       activeProject: null,
+      isGuestMode: false, // <-- 3. DEFAULT TO FALSE
       setActiveProject: (project) => set({ activeProject: project }),
       clearProject: () => set({ activeProject: null }),
+      setGuestMode: (isGuest) => set({ isGuestMode: isGuest }), // <-- 4. ADD THE FUNCTION
     }),
     {
-      name: 'cineos-guest-storage', // This is the secret key saved in their browser
+      name: 'cineos-guest-storage', 
     }
   )
 );

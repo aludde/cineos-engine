@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import { motion } from 'framer-motion';
 
 export default function Dashboard() {
-  const activeProject = useProjectStore((state) => state.activeProject);
+  const activeProject = useProjectStore((state: any) => state.activeProject);
 
   if (!activeProject) {
     return (
@@ -20,21 +20,18 @@ export default function Dashboard() {
   }
 
   // Engine Logic: Group all assets from all scenes by their Category
-  const categorizedAssets = activeProject.scenes.reduce((acc, scene) => {
-    scene.assets.forEach((asset) => {
+  const categorizedAssets = activeProject.scenes.reduce((acc: Record<string, any[]>, scene: any) => {
+    scene.assets.forEach((asset: any) => {
       if (!acc[asset.category]) {
         acc[asset.category] = [];
       }
-      // Prevent duplicates in the overall list
-      if (!acc[asset.category].some((a) => a.description === asset.description)) {
-        acc[asset.category].push(asset);
-      }
+      acc[asset.category].push(asset);
     });
     return acc;
-  }, {} as Record<string, typeof activeProject.scenes[0]['assets']>);
+  }, {} as Record<string, any[]>); 
 
   // Extract unique locations
-  const uniqueLocations = Array.from(new Set(activeProject.scenes.map(s => s.location)));
+  const uniqueLocations = Array.from(new Set(activeProject.scenes.map((s: any) => s.location)));
 
   return (
     <main className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
@@ -68,7 +65,7 @@ export default function Dashboard() {
               Locations ({uniqueLocations.length})
             </h3>
             <ul className="space-y-3">
-              {uniqueLocations.map((loc, idx) => (
+              {uniqueLocations.map((loc: any, idx: number) => (
                 <li key={idx} className="text-neutral-300 font-light text-sm flex items-center gap-2">
                   <div className="w-1.5 h-1.5 bg-neutral-700 rounded-full" />
                   {loc}
@@ -78,13 +75,14 @@ export default function Dashboard() {
           </div>
 
           {/* Dynamic Asset Columns (Cast, Props, Wardrobe, etc.) */}
-          {Object.entries(categorizedAssets).map(([category, assets]) => (
+          {/* THE FIX: We pull rank and cast the entire Object.entries array before mapping */}
+          {(Object.entries(categorizedAssets) as [string, any[]][]).map(([category, assets]) => (
             <div key={category} className="bg-neutral-950 border border-neutral-900 p-6">
               <h3 className="text-[#E62B1E] font-bold uppercase tracking-widest text-sm mb-4 border-b border-neutral-800 pb-2">
                 {category} ({assets.length})
               </h3>
               <ul className="space-y-3">
-                {assets.map((asset, idx) => (
+                {assets.map((asset: any, idx: number) => (
                   <li key={idx} className="text-neutral-300 font-light text-sm flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-neutral-700 rounded-full mt-1.5 shrink-0" />
                     <span>{asset.description}</span>
