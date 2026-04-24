@@ -14,6 +14,7 @@ CRITICAL RULES:
    - Result -> Setting: "EXT", Location: "Downtown Coffee Shop", TimeOfDay: "MAGIC HOUR".
 4. BACKGROUND CAST: Group non-speaking background actors under "Cast" with the prefix "[BG]" (e.g., "[BG] Pedestrians").
 5. ACCURACY: If a category has no items in a scene, omit the items rather than hallucinating them.
+6. Do NOT output duplicate assets within the same scene. If a prop or cast appears multiple times in the script, list it exactly once. Aggregate all identical items.
 
 Return ONLY a raw, valid JSON object matching this exact structure:
 
